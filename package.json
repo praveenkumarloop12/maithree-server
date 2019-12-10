@@ -20,7 +20,7 @@
     "jsonwebtoken": "^8.3.0",
     "moment": "^2.22.1",
     "moment-timezone": "^0.5.17",
-    "morgan": "~1.9.0",
+    "morgan": "~1.9.1",
     "mysql": "^2.15.0",
     "randomstring": "^1.1.5",
     "request": "^2.86.0",
