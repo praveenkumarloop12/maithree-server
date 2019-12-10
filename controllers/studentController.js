@@ -2,10 +2,11 @@ var db = require("../db/config");
 var logger = require("../utils/logger");
 
 var moment = require("moment");
-var momentTz = require('moment-timezone');
 var async = require("async");
 var _ = require("lodash");
 
+const sql_date_format = 'YYYY-MM-DD';
+    
 exports.getStudentsByBranch = (req,res,next) => {
     var sql = "SELECT student_id as studentId, first_name as firstName, last_name as lastName from `student_details` where branch_id = ?";
     var branchId = req.params.id
@@ -94,7 +95,6 @@ exports.getProductsForStudent = (req,res,next) => {
      }
 }
 
-
 exports.getTasksMappedForProduct = (req,res,next) => {
 
     var fetch_tasks_for_product_sql = "select prod.id as productId, steps.id as taskId, task_name as taskName, task_description as taskDescription, target, completed from `maithree-db`.product_master_steps steps JOIN `maithree-db`.product_master prod ON steps.product_master_id = prod.id JOIN `maithree-db`.student_task_mapping_details stud_task ON stud_task.product_master_id = prod.id AND stud_task.product_master_steps_id = steps.id LEFT OUTER JOIN (select * from `maithree-db`.student_task_tracking where date = current_date()) tracking ON stud_task.mapping_id = tracking.student_task_mapping_details_mapping_id where stud_task.product_master_id = ? AND stud_task.student_details_student_id = ?";
@@ -181,7 +181,6 @@ exports.saveStudentTrackingDetails = (req,res,next) => {
     }
 }
 
-
 exports.getStudentProgress = (req,res,next) => {
 
     const date_format = 'YYYY-MM-DD';
@@ -245,307 +244,112 @@ exports.getStudentProgress = (req,res,next) => {
 
 }
 
+function sameMonth (a, b, other) {
+    if (a.month() !== b.month()) {
+        return moment(other).format(sql_date_format);
+    }
+    return moment(a).format(sql_date_format);
+}
+
+function weeks (m) {
+    var lastOfMonth     = m.clone().endOf('month'),
+        firstOfMonth    = m.clone().startOf('month'),
+        currentWeek     = firstOfMonth.clone().day(0),
+        output          = [],
+        startOfWeek,
+        endOfWeek;
+
+    while (currentWeek <= lastOfMonth) {
+        startOfWeek = sameMonth(currentWeek.clone().day(0), firstOfMonth, firstOfMonth);
+        endOfWeek = sameMonth(currentWeek.clone().day(6), firstOfMonth, lastOfMonth);
+        
+        output.push({start: startOfWeek, end: endOfWeek});
+        currentWeek.add(7, 'days');
+    }
+    return output;
+}
+
 exports.getStudentProgressAcrossWeeks = (req, res, next) => {
 
-    const sql_date_format = 'YYYY-MM-DD';
-    const display_date_format = 'MMM Do';
-    const original_date = moment();
-    var studentId = req.query.studentId;
+    let studentId = req.query.studentId;
+    let reqDate = req.query.date || new Date();
+   
+    let original_date = moment(reqDate).startOf("month");
+    let dateRanges = weeks(moment(original_date, sql_date_format));
+   
+    let summaryData = [];
+    let uiData = [];
 
-    var this_week_start_date = original_date.clone().startOf('isoWeek')
-    var this_week_end_date = original_date.clone().endOf('isoWeek')
-    var last_week_start_date = original_date.clone().isoWeekday(-6)
-    var last_week_end_date = original_date.clone().isoWeekday(0)
-    var second_last_week_start_date = original_date.clone().isoWeekday(-13)
-    var second_last_week_end_date = original_date.clone().isoWeekday(-7)
-    var third_last_week_start_date = original_date.clone().isoWeekday(-20)
-    var third_last_week_end_date = original_date.clone().isoWeekday(-14)
-
-    var studentProgressTable = [];
-    var cumulativeWeekTotal = {};
-
-    var fetch_count_query = "select prod.id as productId, prod.product_name as productName, steps.id as taskId, task_name as taskName, SUM(target) as groupedTarget, SUM(completed) as groupedCompleted from `maithree-db`.product_master_steps steps \
+    const fetch_count_query = "select prod.id as productId, prod.product_name as productName, steps.id as taskId, task_name as taskName, SUM(target) as groupedTarget, SUM(completed) as groupedCompleted from `maithree-db`.product_master_steps steps \
         JOIN `maithree-db`.product_master prod ON steps.product_master_id = prod.id \
         JOIN `maithree-db`.student_task_mapping_details stud_task ON stud_task.product_master_id = prod.id AND stud_task.product_master_steps_id = steps.id \
         JOIN (select * from `maithree-db`.student_task_tracking where date >= ? AND date <= ?) tracking ON stud_task.mapping_id = tracking.student_task_mapping_details_mapping_id \
         where stud_task.student_details_student_id = ? group by productId, taskId order by productId ASC, taskId ASC"
 
-    db.query(fetch_count_query, [this_week_start_date.format(sql_date_format), this_week_end_date.format(sql_date_format), studentId], (err, thisWeekProgressResults) => {
-        //Make another query to find last week results
-        db.query(fetch_count_query, [last_week_start_date.format(sql_date_format), last_week_end_date.format(sql_date_format), studentId], (err, lastWeekProgressResults) => {
-            //Make another query to find second last week results
-            db.query(fetch_count_query, [second_last_week_start_date.format(sql_date_format), second_last_week_end_date.format(sql_date_format), studentId], (err, secondLastWeekProgressResults) => {
-                //Make another query to find second last week results
-                db.query(fetch_count_query, [third_last_week_start_date.format(sql_date_format), third_last_week_end_date.format(sql_date_format), studentId], (err, thirdLastWeekProgressResults) => {
+    let dbAllWeekResults = [];
+    async.eachSeries(dateRanges, function(range,cb) {
+        console.log("Dates ***");
+        console.log(range.start, range.end)
+        db.query(fetch_count_query, [range.start, range.end, studentId], (err, weekResults) => {
+            if(err) {
+                dbAllWeekResults.push([]);
+            } else {
+                dbAllWeekResults.push(weekResults);
+            }
+            cb();
+        });
 
-                    if (thisWeekProgressResults.length == 0 && lastWeekProgressResults.length == 0 && secondLastWeekProgressResults.length == 0 && thirdLastWeekProgressResults.length == 0) {
-                        var infoMsg = `No Task Tracking record found for this studentId = ${studentId} in 3 weeks`;
-                        logger.info(infoMsg);
-                        res.status(404).json({ error: infoMsg });
-                    }
-                    else {
+    }, function(err, done) {
+        if(err) {
+            return res.json({
+                uiData : [],
+                dateRanges
+            });
+        }
+        
+        summaryData = [...dbAllWeekResults];
+        let uniqueProductTasksMap = [];
+        let uniqueProductTasksDetails = [];
 
-                        async.waterfall([
-                            async.apply(processEachWeekResults, secondLastWeekProgressResults, 1),
-                            async.apply(processEachWeekResults, lastWeekProgressResults, 2),
-                            async.apply(processEachWeekResults, thisWeekProgressResults, 3)
-                        ], (err, result) => {
-                            if (err) {
-                                logger.error("Error occurred during processing", err);
-                                res.status(500).json({ error: "Error occurred during processing" })
-                            }
-                            logger.info("Processed all 3 week results. Returning to the caller with response. Result ::: ");
-                            res.json(
-                                {
-                                    weeklyTotal: cumulativeWeekTotal,
-                                    progressTable: studentProgressTable
-                                }
-                            );
+        // find unique product and tasks in the system
+        summaryData.forEach((eachWeek, i ) => {
+            eachWeek.forEach((eachProductTask,j) => {
+                if(eachProductTask) {
+                    let key = eachProductTask.productId+ " - "+ eachProductTask.taskId;
+                    if(!uniqueProductTasksMap[key]) {
+                        uniqueProductTasksMap.push(key);
+                        uniqueProductTasksDetails.push({
+                            productId : eachProductTask.productId,
+                            taskId : eachProductTask.taskId,
+                            productName: eachProductTask.productName,
+                            taskName : eachProductTask.taskName     
                         })
-
-                        function processEachWeekResults(eachWeekProgressResults, processIndex, callbackAfterEachWeekProcessing) {
-
-                            if (eachWeekProgressResults.length > 0) {
-
-                                var eachWeekTotal = 0;
-
-                                _.each(eachWeekProgressResults, (eachSLWResult, slwIndex) => {
-
-                                    eachWeekTotal += eachSLWResult.groupedCompleted;
-
-                                    var productLevelProgress = { tasks: [] };
-
-                                    var existingProductIndex = _.findIndex(studentProgressTable, (entry) => {
-                                        return entry.productId === eachSLWResult.productId;
-                                    });
-
-                                    // If the final table doesn't contain this product, then proceed to add product / tasks
-                                    if (existingProductIndex < 0) {
-                                        productLevelProgress.productId = eachSLWResult.productId
-                                        productLevelProgress.productName = eachSLWResult.productName
-                                        productLevelProgress.tasks.push(processNewTaskProgress());
-                                        studentProgressTable.push(productLevelProgress);
-                                    }
-
-                                    else {
-                                        // Get the existing Product entry using the index
-                                        productLevelProgress = studentProgressTable[existingProductIndex];
-
-                                        var existingTaskIndex = _.findIndex(productLevelProgress.tasks, (entry) => {
-                                            return entry.taskId === eachSLWResult.taskId;
-                                        });
-
-                                        if (existingTaskIndex < 0) {
-                                            productLevelProgress.tasks.push(processNewTaskProgress());
-                                        }
-                                    }
-
-                                    function processNewTaskProgress() {
-
-                                        var taskProgress = {
-                                            taskId: eachSLWResult.taskId,
-                                            taskName: eachSLWResult.taskName
-                                        }
-
-                                        //Filter the tasks from other week results and compare.
-                                        var similarProgressFromThirdLastWeek = _.filter(thirdLastWeekProgressResults, (entry) => {
-                                            return entry.productId === eachSLWResult.productId && entry.taskId === eachSLWResult.taskId
-                                        })
-
-                                        if (processIndex == 1) {
-                                            taskProgress.week1 = {
-                                                period: `${second_last_week_start_date.format(display_date_format)} - ${second_last_week_end_date.format(display_date_format)}`,
-                                                target: (eachSLWResult.groupedTarget)?eachSLWResult.groupedTarget:0,
-                                                completed: eachSLWResult.groupedCompleted?eachSLWResult.groupedCompleted:0,
-                                                status: "Equal"
-                                            }
-
-
-                                            if (similarProgressFromThirdLastWeek.length > 0) {
-                                                taskProgress.week1.status = taskProgress.week1.completed > similarProgressFromThirdLastWeek[0].groupedCompleted ?
-                                                    "Improved" : taskProgress.week1.completed < similarProgressFromThirdLastWeek[0].groupedCompleted ? "Declined" : "Equal"
-                                            }
-
-                                            //Filter the tasks from other week results and compare.
-                                            var similarProgressFromPastWeek = _.filter(lastWeekProgressResults, (entry) => {
-                                                return entry.productId === eachSLWResult.productId && entry.taskId === eachSLWResult.taskId
-                                            })
-                                            var similarProgressFromThisWeek = _.filter(thisWeekProgressResults, (entry) => {
-                                                return entry.productId === eachSLWResult.productId && entry.taskId === eachSLWResult.taskId
-                                            })
-
-                                            taskProgress.week2 = {
-                                                period: `${last_week_start_date.format(display_date_format)} - ${last_week_end_date.format(display_date_format)}`,
-                                                target: 0,
-                                                completed: 0,
-                                                status: "Equal"
-                                            }
-
-                                            if (similarProgressFromPastWeek.length > 0) {
-                                                taskProgress.week2.target = similarProgressFromPastWeek[0].groupedTarget
-                                                taskProgress.week2.completed = similarProgressFromPastWeek[0].groupedCompleted
-                                                taskProgress.week2.status = taskProgress.week2.completed > taskProgress.week1.completed ?
-                                                    "Improved" : taskProgress.week2.completed < taskProgress.week1.completed ? "Declined" : "Equal"
-                                            }
-
-                                            taskProgress.week3 = {
-                                                period: `${this_week_start_date.format(display_date_format)} - ${this_week_end_date.format(display_date_format)}`,
-                                                target: 0,
-                                                completed: 0,
-                                                status: "Equal"
-                                            }
-
-                                            if (similarProgressFromThisWeek.length > 0) {
-                                                taskProgress.week3.target = similarProgressFromThisWeek[0].groupedTarget
-                                                taskProgress.week3.completed = similarProgressFromThisWeek[0].groupedCompleted
-
-                                                if (similarProgressFromPastWeek.length > 0) {
-                                                    taskProgress.week3.status = taskProgress.week3.completed > taskProgress.week2.completed ?
-                                                        "Improved" : taskProgress.week3.completed < taskProgress.week2.completed ? "Declined" : "Equal"
-                                                }
-                                            }
-                                        }
-
-                                        // Process records from last week
-                                        else if (processIndex == 2) {
-
-                                            //Filter the tasks from other week results and compare.
-                                            var similarProgressFromPastWeek = _.filter(secondLastWeekProgressResults, (entry) => {
-                                                return entry.productId === eachSLWResult.productId && entry.taskId === eachSLWResult.taskId
-                                            })
-
-                                            var similarProgressFromNextWeek = _.filter(thisWeekProgressResults, (entry) => {
-                                                return entry.productId === eachSLWResult.productId && entry.taskId === eachSLWResult.taskId
-                                            })
-
-                                            taskProgress.week1 = {
-                                                period: `${second_last_week_start_date.format(display_date_format)} - ${second_last_week_end_date.format(display_date_format)}`,
-                                                target: 0,
-                                                completed: 0,
-                                                status: "Equal"
-                                            }
-
-                                            taskProgress.week2 = {
-                                                period: `${last_week_start_date.format(display_date_format)} - ${last_week_end_date.format(display_date_format)}`,
-                                                target: (eachSLWResult.groupedTarget)?eachSLWResult.groupedTarget:0,
-                                                completed: eachSLWResult.groupedCompleted?eachSLWResult.groupedCompleted:0,
-                                                status: "Equal"
-                                            }
-
-                                            if (similarProgressFromPastWeek.length > 0) {
-                                                taskProgress.week1.target = similarProgressFromPastWeek[0].groupedTarget
-                                                taskProgress.week1.completed = similarProgressFromPastWeek[0].groupedCompleted
-
-                                                taskProgress.week2.status = taskProgress.week2.completed > taskProgress.week1.completed ?
-                                                    "Improved" : taskProgress.week2.completed < taskProgress.week1.completed ? "Declined" : "Equal"
-
-                                                if (similarProgressFromThirdLastWeek.length > 0) {
-                                                    taskProgress.week1.status = taskProgress.week1.completed > similarProgressFromThirdLastWeek[0].groupedCompleted ?
-                                                        "Improved" : taskProgress.week1.completed < similarProgressFromThirdLastWeek[0].groupedCompleted ? "Declined" : "Equal"
-                                                }
-                                            }
-
-                                            taskProgress.week3 = {
-                                                period: `${this_week_start_date.format(display_date_format)} - ${this_week_end_date.format(display_date_format)}`,
-                                                target: 0,
-                                                completed: 0,
-                                                status: "Equal"
-
-                                            }
-
-                                            if (similarProgressFromNextWeek.length > 0) {
-                                                taskProgress.week3.target = similarProgressFromNextWeek[0].groupedTarget
-                                                taskProgress.week3.completed = similarProgressFromNextWeek[0].groupedCompleted
-                                                taskProgress.week3.status = taskProgress.week3.completed > taskProgress.week2.completed ?
-                                                    "Improved" : taskProgress.week3.completed < taskProgress.week2.completed ? "Declined" : "Equal"
-                                            }
-                                        }
-
-                                        else {
-
-                                            //Filter the tasks from other week results and compare.
-                                            var similarProgressFromSecondPastWeek = _.filter(secondLastWeekProgressResults, (entry) => {
-                                                return entry.productId === eachSLWResult.productId && entry.taskId === eachSLWResult.taskId
-                                            })
-                                            var similarProgressFromPastWeek = _.filter(lastWeekProgressResults, (entry) => {
-                                                return entry.productId === eachSLWResult.productId && entry.taskId === eachSLWResult.taskId
-                                            })
-
-                                            taskProgress.week2 = {
-                                                period: `${last_week_start_date.format(display_date_format)} - ${last_week_end_date.format(display_date_format)}`,
-                                                target: 0,
-                                                completed: 0,
-                                                status: "Equal"
-                                            }
-
-                                            taskProgress.week3 = {
-                                                period: `${this_week_start_date.format(display_date_format)} - ${this_week_end_date.format(display_date_format)}`,
-                                                target: (eachSLWResult.groupedTarget)?eachSLWResult.groupedTarget:0,
-                                                completed: eachSLWResult.groupedCompleted?eachSLWResult.groupedCompleted:0,
-                                                status: "Equal"
-                                            }
-
-                                            if (similarProgressFromPastWeek.length > 0) {
-                                                taskProgress.week2.target = similarProgressFromPastWeek[0].groupedTarget
-                                                taskProgress.week2.completed = similarProgressFromPastWeek[0].groupedCompleted
-                                                taskProgress.week3.status = taskProgress.week3.completed > taskProgress.week2.completed ?
-                                                    "Improved" : taskProgress.week3.completed < taskProgress.week2.completed ? "Declined" : "Equal"
-                                            }
-
-                                            taskProgress.week1 = {
-                                                period: `${second_last_week_start_date.format(display_date_format)} - ${second_last_week_end_date.format(display_date_format)}`,
-                                                target: 0,
-                                                completed: 0,
-                                                status: "Equal"
-                                            }
-
-                                            if (similarProgressFromSecondPastWeek.length > 0) {
-
-                                                taskProgress.week1.target = similarProgressFromSecondPastWeek[0].groupedTarget
-                                                taskProgress.week1.completed = similarProgressFromSecondPastWeek[0].groupedCompleted
-
-                                                if (similarProgressFromPastWeek.length > 0) {
-                                                    taskProgress.week2.status = taskProgress.week2.completed > taskProgress.week1.completed ?
-                                                        "Improved" : taskProgress.week2.completed < taskProgress.week1.completed ? "Declined" : "Equal"
-                                                }
-
-                                                if (similarProgressFromThirdLastWeek.length > 0) {
-                                                    taskProgress.week1.status = taskProgress.week1.completed > similarProgressFromThirdLastWeek[0].groupedCompleted ?
-                                                        "Improved" : taskProgress.week1.completed < similarProgressFromThirdLastWeek[0].groupedCompleted ? "Declined" : "Equal"
-                                                }
-                                            }
-                                        }
-                                        return taskProgress;
-                                    }
-                                })
-
-                                if (processIndex === 1) {
-                                    cumulativeWeekTotal.week1 = eachWeekTotal;
-                                }
-                                else if (processIndex === 2) {
-                                    cumulativeWeekTotal.week2 = eachWeekTotal;
-                                }
-                                else {
-                                    cumulativeWeekTotal.week3 = eachWeekTotal;
-                                }
-                            }
-                            else {
-                                // Whatever weeks, we don't have tracking data, default it to 0.
-                                if (processIndex === 1) {
-                                    cumulativeWeekTotal.week1 = 0;
-                                }
-                                else if (processIndex === 2) {
-                                    cumulativeWeekTotal.week2 = 0;
-                                }
-                                else {
-                                    cumulativeWeekTotal.week3 = 0;
-                                }
-                            }
-                            callbackAfterEachWeekProcessing(null);
-                        }
                     }
-                })
-            })
-        })
+                }
+            });
+        });
+
+        // form the UI Data with metric for each period
+        uniqueProductTasksDetails.forEach((productTask, i) => {
+            let obj = {
+                ...productTask
+            }
+            let newMetricsArr = [...Array(summaryData.length)].map((metric,i) => {
+                let summaryForWeek = summaryData[i];
+                let values = summaryForWeek.find(f => f.productId == productTask.productId &&
+                    f.taskId == productTask.taskId);
+                return {
+                    groupedTarget: values && values.groupedTarget || 0,
+                    groupedCompleted: values && values.groupedCompleted || 0
+                }
+            });
+            obj.metrics = newMetricsArr;
+            uiData.push(obj);
+        });
+        
+        res.json({
+            uiData,
+            dateRanges
+        });
     })
 }
