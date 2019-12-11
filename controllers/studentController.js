@@ -181,68 +181,68 @@ exports.saveStudentTrackingDetails = (req,res,next) => {
     }
 }
 
-exports.getStudentProgress = (req,res,next) => {
+// exports.getStudentProgress = (req,res,next) => {
 
-    const date_format = 'YYYY-MM-DD';
-    const original_date = moment();
-    const given_date = original_date.clone();
-    var studentId = req.query.studentId;
+//     const date_format = 'YYYY-MM-DD';
+//     const original_date = moment();
+//     const given_date = original_date.clone();
+//     var studentId = req.query.studentId;
 
-    var this_week_start_date = given_date.startOf('isoWeek').format(date_format)
-    var this_week_end_date = given_date.endOf('isoWeek').format(date_format)
-    var last_week_start_date = original_date.clone().isoWeekday(-6).format(date_format)
-    var last_week_end_date = original_date.clone().isoWeekday(0).format(date_format)
-    var second_last_week_start_date = original_date.clone().isoWeekday(-13).format(date_format)
-    var second_last_week_end_date = original_date.clone().isoWeekday(-7).format(date_format)
+//     var this_week_start_date = given_date.startOf('isoWeek').format(date_format)
+//     var this_week_end_date = given_date.endOf('isoWeek').format(date_format)
+//     var last_week_start_date = original_date.clone().isoWeekday(-6).format(date_format)
+//     var last_week_end_date = original_date.clone().isoWeekday(0).format(date_format)
+//     var second_last_week_start_date = original_date.clone().isoWeekday(-13).format(date_format)
+//     var second_last_week_end_date = original_date.clone().isoWeekday(-7).format(date_format)
 
-    var progressResponse = {};
+//     var progressResponse = {};
 
-    var fetch_count_query = "select stud_task.student_details_student_id as studentId, SUM(target) as totalTarget, SUM(completed) as totalCompleted from `maithree-db`.student_task_mapping_details stud_task \
-            JOIN (select * from `maithree-db`.student_task_tracking where date >= ? AND date <= ?) tracking ON stud_task.mapping_id = tracking.student_task_mapping_details_mapping_id \
-            where stud_task.student_details_student_id = ? group by studentId"
+//     var fetch_count_query = "select stud_task.student_details_student_id as studentId, SUM(target) as totalTarget, SUM(completed) as totalCompleted from `maithree-db`.student_task_mapping_details stud_task \
+//             JOIN (select * from `maithree-db`.student_task_tracking where date >= ? AND date <= ?) tracking ON stud_task.mapping_id = tracking.student_task_mapping_details_mapping_id \
+//             where stud_task.student_details_student_id = ? group by studentId"
 
-    db.query(fetch_count_query,[this_week_start_date, this_week_end_date, studentId], (err, thisWeekProgressResults) => {
-        //Make another query to find last week results
-        db.query(fetch_count_query,[last_week_start_date, last_week_end_date, studentId], (err, lastWeekProgressResults) => {
+//     db.query(fetch_count_query,[this_week_start_date, this_week_end_date, studentId], (err, thisWeekProgressResults) => {
+//         //Make another query to find last week results
+//         db.query(fetch_count_query,[last_week_start_date, last_week_end_date, studentId], (err, lastWeekProgressResults) => {
 
-            //Compare the results and send the response
-            console.log("This week result ::: ", thisWeekProgressResults);
-            console.log("Last week result ::: ", lastWeekProgressResults);
+//             //Compare the results and send the response
+//             console.log("This week result ::: ", thisWeekProgressResults);
+//             console.log("Last week result ::: ", lastWeekProgressResults);
 
-            if (thisWeekProgressResults.length == 0 || lastWeekProgressResults.length == 0) {
-                progressResponse.studentId = studentId;
-                progressResponse.status = "No comparison"
-                progressResponse.this_week = {
-                    range : this_week_start_date + " to " + this_week_end_date,
-                    target : (thisWeekProgressResults.length > 0 ? thisWeekProgressResults[0].totalTarget : 0),
-                    completed : (thisWeekProgressResults.length > 0 ? thisWeekProgressResults[0].totalCompleted : 0)
-                }
-                progressResponse.last_week = {
-                    range : last_week_start_date + " to " + last_week_end_date,
-                    target : (lastWeekProgressResults.length > 0 ? lastWeekProgressResults[0].totalTarget : 0),
-                    completed : (lastWeekProgressResults.length > 0 ? lastWeekProgressResults[0].totalCompleted : 0)
-                }
-            }
-            else if (thisWeekProgressResults.length > 0 || lastWeekProgressResults > 0) {
-                progressResponse.studentId = studentId;
-                progressResponse.this_week = {
-                    range : this_week_start_date + " to " + this_week_end_date,
-                    target : thisWeekProgressResults[0].totalTarget,
-                    completed : thisWeekProgressResults[0].totalCompleted
-                }
-                progressResponse.last_week = {
-                    range : last_week_start_date + " to " + last_week_end_date,
-                    target : lastWeekProgressResults[0].totalTarget,
-                    completed : lastWeekProgressResults[0].totalCompleted
-                }
-                progressResponse.status = progressResponse.this_week.completed > progressResponse.last_week.completed ?
-                    "Improved" : progressResponse.this_week.completed < progressResponse.last_week.completed ? "Declined" : "Equal";
-            }
-            res.json(progressResponse);
-        })
-    })
+//             if (thisWeekProgressResults.length == 0 || lastWeekProgressResults.length == 0) {
+//                 progressResponse.studentId = studentId;
+//                 progressResponse.status = "No comparison"
+//                 progressResponse.this_week = {
+//                     range : this_week_start_date + " to " + this_week_end_date,
+//                     target : (thisWeekProgressResults.length > 0 ? thisWeekProgressResults[0].totalTarget : 0),
+//                     completed : (thisWeekProgressResults.length > 0 ? thisWeekProgressResults[0].totalCompleted : 0)
+//                 }
+//                 progressResponse.last_week = {
+//                     range : last_week_start_date + " to " + last_week_end_date,
+//                     target : (lastWeekProgressResults.length > 0 ? lastWeekProgressResults[0].totalTarget : 0),
+//                     completed : (lastWeekProgressResults.length > 0 ? lastWeekProgressResults[0].totalCompleted : 0)
+//                 }
+//             }
+//             else if (thisWeekProgressResults.length > 0 || lastWeekProgressResults > 0) {
+//                 progressResponse.studentId = studentId;
+//                 progressResponse.this_week = {
+//                     range : this_week_start_date + " to " + this_week_end_date,
+//                     target : thisWeekProgressResults[0].totalTarget,
+//                     completed : thisWeekProgressResults[0].totalCompleted
+//                 }
+//                 progressResponse.last_week = {
+//                     range : last_week_start_date + " to " + last_week_end_date,
+//                     target : lastWeekProgressResults[0].totalTarget,
+//                     completed : lastWeekProgressResults[0].totalCompleted
+//                 }
+//                 progressResponse.status = progressResponse.this_week.completed > progressResponse.last_week.completed ?
+//                     "Improved" : progressResponse.this_week.completed < progressResponse.last_week.completed ? "Declined" : "Equal";
+//             }
+//             res.json(progressResponse);
+//         })
+//     })
 
-}
+// }
 
 function sameMonth (a, b, other) {
     if (a.month() !== b.month()) {
@@ -269,13 +269,55 @@ function weeks (m) {
     return output;
 }
 
-exports.getStudentProgressAcrossWeeks = (req, res, next) => {
+function quarters(quarterIndex) {
+    let output = [];
+    let monthsToAdd = 0;
+    switch(quarterIndex) {
+        case 1: 
+            monthsToAdd = 0;
+            break;
+        case 2:
+            monthsToAdd = 3;
+            break;
+        case 3:
+            monthsToAdd = 6;
+            break;
+        case 4:
+            monthsToAdd = 9;
+            break;
+        default:
+            monthsToAdd = 0;
+    }
+    let m = moment().startOf("year");
+    output.push({
+        start: m.clone().add(monthsToAdd,'months').startOf("month").format(sql_date_format), 
+        end: m.clone().add(monthsToAdd,'months').endOf("month").format(sql_date_format)
+    },{
+        start: m.clone().add(monthsToAdd+ 1,'months').startOf("month").format(sql_date_format), 
+        end: m.clone().add(monthsToAdd + 1,'month').endOf("month").format(sql_date_format)
+    },{
+        start: m.clone().add(monthsToAdd + 2,'months').startOf("month").format(sql_date_format), 
+        end: m.clone().add(monthsToAdd + 2,'month').endOf("month").format(sql_date_format)
+    })
+    return output;
+}
+
+exports.getStudentProgress = (req, res, next) => {
 
     let studentId = req.query.studentId;
-    let reqDate = req.query.date || new Date();
-   
-    let original_date = moment(reqDate).startOf("month");
-    let dateRanges = weeks(moment(original_date, sql_date_format));
+    let type = req.query.type;
+    let dateRanges = [];
+    let reqDate = null;
+    if(type === "quarterly") {
+        console.log("get quarterly results");
+        let quarterIndex = req.query.quarterIndex || '0';
+        dateRanges = quarters(Number(quarterIndex));
+    } else {
+        console.log("get monthly results");
+        reqDate = req.query.date || new Date();
+        let original_date = moment(reqDate).startOf("month");
+        dateRanges = weeks(moment(original_date, sql_date_format));
+    }
    
     let summaryData = [];
     let uiData = [];
@@ -286,19 +328,18 @@ exports.getStudentProgressAcrossWeeks = (req, res, next) => {
         JOIN (select * from `maithree-db`.student_task_tracking where date >= ? AND date <= ?) tracking ON stud_task.mapping_id = tracking.student_task_mapping_details_mapping_id \
         where stud_task.student_details_student_id = ? group by productId, taskId order by productId ASC, taskId ASC"
 
-    let dbAllWeekResults = [];
+    let dbAllResults = [];
     async.eachSeries(dateRanges, function(range,cb) {
         console.log("Dates ***");
         console.log(range.start, range.end)
-        db.query(fetch_count_query, [range.start, range.end, studentId], (err, weekResults) => {
+        db.query(fetch_count_query, [range.start, range.end, studentId], (err, results) => {
             if(err) {
-                dbAllWeekResults.push([]);
+                dbAllResults.push([]);
             } else {
-                dbAllWeekResults.push(weekResults);
+                dbAllResults.push(results);
             }
             cb();
         });
-
     }, function(err, done) {
         if(err) {
             return res.json({
@@ -307,13 +348,13 @@ exports.getStudentProgressAcrossWeeks = (req, res, next) => {
             });
         }
         
-        summaryData = [...dbAllWeekResults];
+        summaryData = [...dbAllResults];
         let uniqueProductTasksMap = [];
         let uniqueProductTasksDetails = [];
 
         // find unique product and tasks in the system
-        summaryData.forEach((eachWeek, i ) => {
-            eachWeek.forEach((eachProductTask,j) => {
+        summaryData.forEach((eachRow, i ) => {
+            eachRow.forEach((eachProductTask,j) => {
                 if(eachProductTask) {
                     let key = eachProductTask.productId+ " - "+ eachProductTask.taskId;
                     if(!uniqueProductTasksMap[key]) {
@@ -335,8 +376,8 @@ exports.getStudentProgressAcrossWeeks = (req, res, next) => {
                 ...productTask
             }
             let newMetricsArr = [...Array(summaryData.length)].map((metric,i) => {
-                let summaryForWeek = summaryData[i];
-                let values = summaryForWeek.find(f => f.productId == productTask.productId &&
+                let summaryRow = summaryData[i];
+                let values = summaryRow.find(f => f.productId == productTask.productId &&
                     f.taskId == productTask.taskId);
                 return {
                     groupedTarget: values && values.groupedTarget || 0,

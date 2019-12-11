@@ -91,7 +91,7 @@ branchRouter.route('/:id/studentProgress')
     console.log(' Inside branch router with getStudentProgress for student ::: ', req.query.studentId);
     next();
 })
-.get(studentController.getStudentProgressAcrossWeeks)
+.get(studentController.getStudentProgress)
 
 // Get Task details for a product
 branchRouter.route('/:id/saveStudentTracking')
