@@ -58,8 +58,22 @@ adminRouter.route('/editStudent')
     })
     .post(adminController.editStudentDetails);
 
+    adminRouter.route('/addMember')
+    .all(function (req, res, next) {
+        next();
+    })
+    .post(adminController.addMember);
 
+adminRouter.route('/editMember')
+    .all(function (req, res, next) {
+        next();
+    })
+    .post(adminController.updateMember);
 
-//getBranchProductDetailsForTarget
+adminRouter.route('/getAllMembers')
+    .all(function (req, res, next) {
+        next();
+    })
+    .get(adminController.getMembers);
 
 module.exports = adminRouter;
