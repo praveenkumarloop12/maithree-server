@@ -58,7 +58,13 @@ adminRouter.route('/editStudent')
     })
     .post(adminController.editStudentDetails);
 
-    adminRouter.route('/addMember')
+adminRouter.route('/getAllStudents')
+    .all(function (req, res, next) {
+        next();
+    })
+    .get(adminController.getAllStudents);
+
+adminRouter.route('/addMember')
     .all(function (req, res, next) {
         next();
     })
