@@ -8,11 +8,22 @@ var _ = require("lodash");
 const sql_date_format = 'YYYY-MM-DD';
     
 exports.getStudentsByBranch = (req,res,next) => {
+    
     var sql = "SELECT student_id as studentId, first_name as firstName, last_name as lastName from `student_details` where branch_id = ?";
     var branchId = req.params.id
+    var teacherID = parseInt(req.query.teacherID);
+    
+    var inputArr = [branchId]
+
+    if(teacherID) {
+      
+        sql+="and member_id = ?"
+        inputArr.push(teacherID);
+    }
+
     logger.info(`Get students for branch id ::: ${branchId}`);
     try {
-       db.query(sql,[branchId], function(err, result) {
+       db.query(sql,inputArr, function(err, result) {
           if (err) {
             logger.error(err);
             return next(err);
@@ -310,6 +321,7 @@ exports.getStudentProgress = (req, res, next) => {
     let reqDate = null;
     if(type === "quarterly") {
         console.log("get quarterly results");
+        console.log(req.query.quarterIndex) 
         let quarterIndex = req.query.quarterIndex || '0';
         dateRanges = quarters(Number(quarterIndex));
     } else {

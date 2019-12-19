@@ -224,7 +224,7 @@ exports.productSummaryReport = (req,res, next) => {
 
     var startDate = req.query.startDate ? moment(req.query.startDate) : original_date.clone().subtract(30, "days");
     var endDate = req.query.endDate ? moment(req.query.endDate) : original_date.clone();
-
+    console.log(startDate, endDate)
     if (!startDate.isValid() || !endDate.isValid()) {
         return res.status(400).json({ error: "Input dates are not valid" });
     }
@@ -240,7 +240,7 @@ exports.productSummaryReport = (req,res, next) => {
     try {
 
         logger.info(`Get Product Summary Report for the duration ::: Start Date =  ${startDate}, End Date = ${endDate}`);
-
+        console.log(sql)
         db.query(sql, [startDate.format(sql_date_format), endDate.format(sql_date_format)], (err, result) => {
             if (err) {
                 logger.error(err);
