@@ -620,7 +620,7 @@ exports.editStudentDetails = (req, res, next) => {
 
     var firstName = req.body.firstName;
     var middleName = req.body.middleName;
-    var lastName = req.body.tasks.lastName;
+    var lastName = req.body.lastName;
     var nickName = req.body.nickName;
     var guardainName = req.body.guardainName;
     var phoneNumber = req.body.phoneNumber;
@@ -631,14 +631,14 @@ exports.editStudentDetails = (req, res, next) => {
     var gender = req.body.gender;
     var dob = req.body.dob;
     var branchId = req.body.branchId;
-    var tasks = req.body.tasks;
-    var studentId = req.body.studentId;
+    var studentId = req.body.id;
+    var memberId = req.body.memberId;
 
 
     var delete_student_task_mapping_query = "delete from  `student_task_mapping_details` where student_details_student_id =" + studentId;
     var insert_student_task_mapping_query = "INSERT into `student_task_mapping_details` (product_master_id,product_master_steps_id,student_details_student_id,created_time) VALUES(?)";
 
-    var update_student_query = "update `student_details` set first_name = ? ,middle_name = ?,last_name = ?,nick_name = ?,guardain_name = ?,phone_number = ?,email_address = ?,address = ?,state = ?,pincode = ?,gender = ?,dob = ?,branch_id = ?,created_time= ? where student_id = ? ";
+    var update_student_query = "update `maithree-db`.`student_details` set first_name = ? ,middle_name = ?,last_name = ?,nick_name = ?,guardain_name = ?,phone_number = ?,email_address = ?,address = ?,state = ?,pincode = ?,gender = ?,dob = ?,branch_id = ?, member_id = ?, created_time= ? where student_id = ? ";
     var update_product_query = "update `product_master` set product_name = ? , product_description = ?, number_of_task = ? where id = ? ";
 
 
@@ -657,6 +657,7 @@ exports.editStudentDetails = (req, res, next) => {
             gender,
             dob,
             branchId,
+            memberId,
             new Date(),
             studentId];
 
@@ -673,4 +674,20 @@ exports.editStudentDetails = (req, res, next) => {
     }
     return res.json({status: true});
 
+};
+
+exports.getAllStudents = function(req,res,next) {
+    var sql = "SELECT * from `maithree-db`.student_details";
+    try {
+       db.query(sql, function(err, result) {
+          if (err) {
+            logger.error(err);
+            return next(err);
+          }
+          res.json(result);
+        });
+    } catch (err) {
+        logger.error(err);
+        next(err);
+    }
 };
