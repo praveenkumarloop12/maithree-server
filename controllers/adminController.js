@@ -447,6 +447,78 @@ exports.getAllProductDetails = (req, res, next) => {
     }
 };
 
+exports.addMember = (req, res, next) => {
+    let name = req.body.initial+req.body.name;
+    let contact = req.body.contact;
+    let code = req.body.code;
+    let branchId = req.body.branchId;
+    let isActive = req.body.isActive;
+    let isAdmin = req.body.isAdmin;
+    let insert_query = "INSERT INTO `maithree-db`.`member` (`branch_id`, `name`, `code`, `contact_no`, `is_admin`, `active`) VALUES(?)";
+    try {
+        let payload = [
+            branchId,
+            name,
+            code,
+            contact,
+            isAdmin,
+            isActive
+        ];
+        db.query(insert_query, [payload], function (err, result) {
+            if (err) throw err;
+            return res.json({status: true});
+        });
+    } catch (error) {
+        console.log(error);
+        return res.json({status: false});
+    }
+};
+
+exports.getMembers = function(req,res,next) {
+    var sql = "SELECT * from `maithree-db`.member";
+    try {
+       db.query(sql, function(err, result) {
+          if (err) {
+            logger.error(err);
+            return next(err);
+          }
+          logger.info("Teacher Data found for the branch id ");
+          res.json(result);
+        });
+    } catch (err) {
+        logger.error(err);
+        next(err);
+    }
+};
+
+exports.updateMember = (req, res, next) => {
+    let name = req.body.initial+req.body.name;
+    let contact = req.body.contact;
+    let code = req.body.code;
+    let branchId = req.body.branchId;
+    let id = req.body.id;
+    let isActive = req.body.isActive;
+    let isAdmin = req.body.isAdmin;
+    let udpate_query = "UPDATE `maithree-db`.`member` SET branch_id = ?, name = ?, code = ?, contact_no = ?, is_admin = ?, active = ? WHERE id = ?";
+    try {
+        let payload = [
+            branchId,
+            name,
+            code,
+            contact,
+            isAdmin,
+            isActive,
+            id
+        ];
+        db.query(udpate_query, payload, function (err, result) {
+            if (err) throw err;
+            return res.json({status: true});
+        });
+    } catch (error) {
+        console.log(error);
+        return res.json({status: false});
+    }
+};
 
 exports.addStudentDetails = (req, res, next) => {
 
@@ -463,8 +535,9 @@ exports.addStudentDetails = (req, res, next) => {
     var gender = req.body.gender;
     var dob = req.body.dob;
     var branchId = req.body.branchId;
+    let memberId = req.body.memberId;
     var tasks = req.body.tasks;
-    var insert_student_query = "INSERT into `student_details` (first_name ,middle_name ,last_name ,nick_name ,guardain_name ,phone_number ,email_address ,address ,state ,pincode ,gender ,dob ,branch_id ,created_time) VALUES(?)";
+    var insert_student_query = "INSERT into `student_details` (first_name ,middle_name ,last_name ,nick_name ,guardain_name ,phone_number ,email_address ,address ,state ,pincode ,gender ,dob ,branch_id, member_id,created_time) VALUES(?)";
     var insert_student_task_mapping_query = "INSERT into `student_task_mapping_details` (product_master_id,product_master_steps_id,student_details_student_id,created_time) VALUES(?)";
     try {
         var student_values = [
@@ -481,6 +554,7 @@ exports.addStudentDetails = (req, res, next) => {
             gender,
             dob,
             branchId,
+            memberId,
             new Date()];
 
         // insert into student table
@@ -546,7 +620,7 @@ exports.editStudentDetails = (req, res, next) => {
 
     var firstName = req.body.firstName;
     var middleName = req.body.middleName;
-    var lastName = req.body.tasks.lastName;
+    var lastName = req.body.lastName;
     var nickName = req.body.nickName;
     var guardainName = req.body.guardainName;
     var phoneNumber = req.body.phoneNumber;
@@ -557,14 +631,14 @@ exports.editStudentDetails = (req, res, next) => {
     var gender = req.body.gender;
     var dob = req.body.dob;
     var branchId = req.body.branchId;
-    var tasks = req.body.tasks;
-    var studentId = req.body.studentId;
+    var studentId = req.body.id;
+    var memberId = req.body.memberId;
 
 
     var delete_student_task_mapping_query = "delete from  `student_task_mapping_details` where student_details_student_id =" + studentId;
     var insert_student_task_mapping_query = "INSERT into `student_task_mapping_details` (product_master_id,product_master_steps_id,student_details_student_id,created_time) VALUES(?)";
 
-    var update_student_query = "update `student_details` set first_name = ? ,middle_name = ?,last_name = ?,nick_name = ?,guardain_name = ?,phone_number = ?,email_address = ?,address = ?,state = ?,pincode = ?,gender = ?,dob = ?,branch_id = ?,created_time= ? where student_id = ? ";
+    var update_student_query = "update `maithree-db`.`student_details` set first_name = ? ,middle_name = ?,last_name = ?,nick_name = ?,guardain_name = ?,phone_number = ?,email_address = ?,address = ?,state = ?,pincode = ?,gender = ?,dob = ?,branch_id = ?, member_id = ?, created_time= ? where student_id = ? ";
     var update_product_query = "update `product_master` set product_name = ? , product_description = ?, number_of_task = ? where id = ? ";
 
 
@@ -583,43 +657,10 @@ exports.editStudentDetails = (req, res, next) => {
             gender,
             dob,
             branchId,
+            memberId,
             new Date(),
             studentId];
 
-        // delete from student task mapping table
-        /* db.query(delete_student_task_mapping_query, function (err, result, fields) {
-                if (err) {
-                    logger.error(err);
-                }
-
-
-                for (let task of tasks) {
-
-                    var task_values = [
-                        task.productId,
-                        task.taskId,
-                        studentId,
-                        new Date()
-                    ];
-                    // insert into student and tasks mapping table
-                    db.query(insert_student_task_mapping_query, [task_values], function (err, insRes) {
-                        if (err) {
-                            logger.error(err);
-                        }
-                    });
-
-                }
-
-                // update student
-
-                db.query(update_student_query, student_values, function (err, result) {
-
-                    if (err) {
-                        logger.error(err);
-                    }
-                });
-            });
- */
             // update student
             db.query(update_student_query, student_values, function (err, result) {
                 if (err) {
@@ -633,4 +674,20 @@ exports.editStudentDetails = (req, res, next) => {
     }
     return res.json({status: true});
 
+};
+
+exports.getAllStudents = function(req,res,next) {
+    var sql = "SELECT * from `maithree-db`.student_details";
+    try {
+       db.query(sql, function(err, result) {
+          if (err) {
+            logger.error(err);
+            return next(err);
+          }
+          res.json(result);
+        });
+    } catch (err) {
+        logger.error(err);
+        next(err);
+    }
 };

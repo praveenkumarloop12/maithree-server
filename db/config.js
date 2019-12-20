@@ -15,7 +15,7 @@ var decrypt = require("./util").decrypt;
 var connection = mysql.createConnection({
     host:'localhost',
     user: "root",
-    password : "",
+    password : "root",
     database: 'maithree-db',
     dateStrings : true
 });
